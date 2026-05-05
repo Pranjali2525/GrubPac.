@@ -1,0 +1,112 @@
+EDUBROADCAST – FRONTEND NOTES
+==============================
+
+PROJECT STRUCTURE
+-----------------
+app/                    → Next.js App Router pages
+  login/                → Auth page (public)
+  teacher/              → Teacher-only pages
+    dashboard/          → Stats + recent content overview
+    upload/             → Content upload form
+    my-content/         → All teacher content with filters
+  principal/            → Principal-only pages
+    dashboard/          → Stats + pending preview
+    approvals/          → Approve/reject pending items
+    all-content/        → Full content table with filters
+  live/[teacherId]/     → Public live broadcast page
+
+components/
+  ui/index.js           → All reusable primitives (Button, Input, Card, Modal, Badge, etc.)
+  layout/               → DashboardLayout (sidebar + topbar)
+  auth/ProtectedRoute   → Auth guard HOC
+  teacher/ContentCard   → Shared content card used in grids
+
+services/
+  auth.service.js       → login, logout, validateToken
+  content.service.js    → getAllContent, getTeacherContent, uploadContent, getLiveContent, stats
+  approval.service.js   → getPendingContent, approveContent, rejectContent
+
+hooks/
+  useData.js            → useData (generic fetch), usePolling (auto-refresh)
+
+context/
+  AuthContext.js        → Global auth state (user, login, logout, isAuthenticated)
+
+lib/
+  mockData.js           → Mock users, 50+ mock content items, in-memory CRUD
+  httpClient.js         → Axios instance with token injection + 401 handling
+
+utils/
+  helpers.js            → formatDate, formatDateTime, getStatusStyle, cn, etc.
+
+---
+
+AUTHENTICATION FLOW
+--------------------
+1. User visits /login
+2. Form validated with react-hook-form + zod
+3. On submit: authService.login() called → returns { token, user }
+4. Token stored in localStorage as "auth_token"
+5. AuthContext (React Context) holds user state globally
+6. On app load, validateToken() re-hydrates session from localStorage
+7. ProtectedRoute component redirects unauthenticated users to /login
+8. Axios interceptor attaches "Authorization: Bearer <token>" to all API requests
+9. On 401 response, token is cleared and user is redirected to /login
+
+---
+
+ROLE-BASED ROUTING
+-------------------
+- Teachers can access: /teacher/dashboard, /teacher/upload, /teacher/my-content
+- Principals can access: /principal/dashboard, /principal/approvals, /principal/all-content
+- Public (no auth): /live/:teacherId
+- ProtectedRoute component enforces allowedRoles on each page
+- Wrong-role access redirects to the user's own dashboard
+
+---
+
+API INTEGRATION APPROACH
+--------------------------
+All API calls go through the service layer only. Components NEVER call APIs directly.
+
+To switch to a real backend:
+1. Update NEXT_PUBLIC_API_URL in .env.local
+2. Replace mock logic in each service with httpClient.get/post/put calls
+3. Component code stays unchanged — clean separation of concerns
+
+Service layer responsibilities:
+- Data fetching / mutation
+- Error handling / normalization
+- Mock delay simulation (remove in production)
+
+---
+
+STATE MANAGEMENT
+-----------------
+- React Context (AuthContext): global auth state only
+- useState / useMemo: local component state + derived filtering
+- useData / usePolling custom hooks: async data loading with loading/error/data
+- No Redux / Zustand needed — state is minimal and co-located
+
+---
+
+ASSUMPTIONS
+-----------
+1. Backend not provided — all data is mocked in-memory (lib/mockData.js)
+2. File uploads store a local base64 DataURL for preview; real backend would return a CDN URL
+3. 50 mock content items pre-seeded for performance testing
+4. Live page (/live/:teacherId) polls every 30 seconds for updates
+5. Session persists via localStorage (use httpOnly cookies for production)
+6. All dates/times are in the local timezone of the browser
+7. Teacher IDs used in demo: t1 (Sarah Johnson), t2 (Mark Davis)
+   → Test live page at: /live/t1
+
+---
+
+DEMO CREDENTIALS
+-----------------
+Teacher:   teacher@school.com   / teacher123
+Teacher 2: teacher2@school.com  / teacher123
+Principal: principal@school.com / principal123
+
+Live page: http://localhost:3000/live/t1
